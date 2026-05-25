@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+
 public class OrdenReabastecimiento {
     @Id
     @GeneratedValue(strategy= GenerationType.IDENTITY)
@@ -40,4 +41,13 @@ public class OrdenReabastecimiento {
 
     @Column(nullable = false)
     private double total;
+
+    public OrdenReabastecimiento(LocalDate fechaRecepcion, LocalDate fechaSolicitud, Long idOrden, Long idSucursal, String rutProveedor, double total) {
+        this.fechaRecepcion = fechaRecepcion;
+        this.fechaSolicitud = fechaSolicitud;
+        this.idOrden = idOrden;
+        this.idSucursal = idSucursal;
+        this.rutProveedor = rutProveedor;
+        this.total = total;
+    }
 }
