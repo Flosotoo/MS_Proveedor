@@ -1,66 +1,48 @@
 package com.proveedor.msproveedor.model;
 
-import java.time.LocalDateTime;
-import jakarta.validation.*;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-
-import java.util.List;
-
-import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @Entity
-@Table(name = "ordenes_compra")
-@Builder
-@Getter
-@Setter
+@Table(name = "orden_compra")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-
 public class OrdenCompra {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long idOrden;
 
-    @NotNull(message = "El proveedor es obligatorio")
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "rut", nullable = false)
+    @JoinColumn(name = "id_proveedor", nullable = false, foreignKey = @ForeignKey(name = "fk_orden_proveedor"))
     private Proveedor proveedor;
 
-    @NotNull(message = "La sucursal es obligatoria")
-    @Positive(message = "El ID de la sucursal debe ser un número positivo")
     @Column(nullable = false)
-    private Long sucursalId;
-
-    @NotNull(message = "El usuario que crea la orden es obligatorio")
-    @Positive(message = "El ID del usuario debe ser un número positivo")
-    @Column(name = "creado_por_usuario_id", nullable = false, updatable = false)
-    private Long creadoPorUsuarioId;
-
-    @Positive(message = "El ID del usuario que autoriza debe ser un número positivo")
-    @Column(name = "autorizado_por_usuario_id")
-    private Long autorizadoPorUsuarioId;
-
-    @NotNull(message = "El estado de la orden es obligatorio")
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    @Builder.Default
-    private  EstadoOrden estado = EstadoOrden.PENDIENTE_AUTORIZACION;
-
-    @Column(name = "fecha_solicitud", nullable = false, updatable = false)
     private LocalDateTime fechaSolicitud;
 
-    @Column(name = "fecha_autorizacion")
-    private LocalDateTime fechaAutorizacion;
+    @Column(nullable = true)
+    private LocalDateTime fechaRecepcion;
 
-    @PrePersist
-    public void prePersist() {
-        this.fechaSolicitud = LocalDateTime.now();
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private EstadoOrden estado;
 
-    @NotEmpty(message = "La orden de compra debe tener al menos un producto")
-    @OneToMany(mappedBy = "ordenCompra", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<@Valid DetalleOrdenCompra> detalles;
+    @Column(nullable = false, precision = 10, scale = 0)
+    private BigDecimal total;
+
+    @OneToMany(mappedBy = "ordenCompra", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DetalleOrden> detalles;
+
 }

@@ -5,5 +5,4 @@ public enum EstadoOrden {
     AUTORIZADA,
     RECHAZADA,
     RECIBIDA
-    
 }
