@@ -1,0 +1,14 @@
+package com.proveedor.msproveedor.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AjusteStockDTO {
+    private Long idProducto;
+    private Long idSucursal;
+    private int cantidad;
+}

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @Entity
@@ -27,6 +28,11 @@ public class OrdenCompra {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_proveedor", nullable = false, foreignKey = @ForeignKey(name = "fk_orden_proveedor"))
     private Proveedor proveedor;
+
+    @NotNull(message = "La sucursal es obligatoria")
+    @Positive(message = "El id de sucursal debe ser un número positivo")
+    @Column(name = "id_sucursal", nullable = false)
+    private Long idSucursal;
 
     @Column(nullable = false)
     private LocalDateTime fechaSolicitud;
