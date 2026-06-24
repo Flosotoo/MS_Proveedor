@@ -102,9 +102,6 @@ public class OrdenCompraService {
     }
 
     public OrdenCompra recibirOrden(Long id) {
-        // HU-20: Logística confirma la recepción física de una orden Autorizada.
-        // Igual que crearOrdenCompra: llamada SINCRONA a MS Productos y Stock,
-        // el manejo de fallas queda a cargo del try-catch en el Controller.
         OrdenCompra orden = buscarOrConFallar(id);
         if (orden.getEstado() != EstadoOrden.AUTORIZADA) {
             throw new EstadoInvalidoException("Solo se puede recibir una orden que esté Autorizada");
@@ -112,7 +109,8 @@ public class OrdenCompraService {
 
         for (DetalleOrden detalle : orden.getDetalles()) {
             AjusteStockDTO ajuste = new AjusteStockDTO(
-                    detalle.getIdProducto(), orden.getIdSucursal(), detalle.getCantidad());
+                    detalle.getIdProducto(), orden.getIdSucursal(), detalle.getCantidad(),
+                    "orden-" + orden.getIdOrden() + "-producto-" + detalle.getIdProducto());
             restTemplate.put(URL_MS_INVENTARIO_AJUSTE, ajuste);
         }
 

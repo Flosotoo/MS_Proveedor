@@ -37,11 +37,7 @@ public class ProveedorController {
 
     @PostMapping
     public ResponseEntity<Proveedor> postProveedor(@Valid @RequestBody Proveedor proveedor) {
-        try {
-            return new ResponseEntity<>(proveedorService.crearProveedor(proveedor), HttpStatus.CREATED); // HU-16
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.CONFLICT);
-        }
+        return new ResponseEntity<>(proveedorService.crearProveedor(proveedor), HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
@@ -53,19 +49,11 @@ public class ProveedorController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Proveedor> putProveedor(@PathVariable Long id, @Valid @RequestBody Proveedor proveedor) {
-        try {
-            return new ResponseEntity<>(proveedorService.actualizarProveedor(id, proveedor), HttpStatus.OK); // HU-18
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.CONFLICT);
-        }
+        return new ResponseEntity<>(proveedorService.actualizarProveedor(id, proveedor), HttpStatus.OK);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Proveedor> eliminarProveedor(@PathVariable Long id) {
-        try {
-            return new ResponseEntity<>(proveedorService.desactivarProveedor(id), HttpStatus.OK); // HU-19
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.CONFLICT);
-        }
+        return new ResponseEntity<>(proveedorService.desactivarProveedor(id), HttpStatus.OK);
     }
 }

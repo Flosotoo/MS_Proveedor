@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.*;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -47,6 +48,7 @@ public class OrdenCompra {
     @Column(nullable = false, precision = 10, scale = 0)
     private BigDecimal total;
 
+    @Valid
     @OneToMany(mappedBy = "ordenCompra", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<DetalleOrden> detalles;
