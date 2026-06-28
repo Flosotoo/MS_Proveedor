@@ -1,4 +1,4 @@
-package com.proveedor.msproveedor.model;
+package com.proveedor.msproveedor.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -13,13 +13,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import com.proveedor.msproveedor.dto.AjusteStockDTO;
+import com.proveedor.msproveedor.dto.ProductoDTO;
 import com.proveedor.msproveedor.exception.EstadoInvalidoException;
 import com.proveedor.msproveedor.exception.RecursoNoEncontradoException;
-import com.proveedor.msproveedor.model.AjusteStockDTO;
 import com.proveedor.msproveedor.model.DetalleOrden;
 import com.proveedor.msproveedor.model.EstadoOrden;
+import com.proveedor.msproveedor.model.EstadoProveedor;
 import com.proveedor.msproveedor.model.OrdenCompra;
-import com.proveedor.msproveedor.model.ProductoDTO;
 import com.proveedor.msproveedor.model.Proveedor;
 import com.proveedor.msproveedor.repository.OrdenCompraRepository;
 import com.proveedor.msproveedor.repository.ProveedorRepository;
@@ -47,6 +48,13 @@ public class OrdenCompraService {
         Proveedor proveedorCompleto = proveedorRepository.findById(orden.getProveedor().getIdProveedor())
                 .orElseThrow(() -> new RecursoNoEncontradoException(
                         "No se encontró el proveedor con id " + orden.getProveedor().getIdProveedor()));
+
+        // No se puede comprar a un proveedor dado de baja
+        if (proveedorCompleto.getEstado() == EstadoProveedor.INACTIVO) {
+            throw new EstadoInvalidoException(
+                    "No se puede crear una orden para un proveedor inactivo (id "
+                            + proveedorCompleto.getIdProveedor() + ")");
+        }
 
         orden.setProveedor(proveedorCompleto);
         BigDecimal totalOrden = BigDecimal.ZERO;
@@ -91,7 +99,6 @@ public class OrdenCompraService {
     }
 
     public OrdenCompra rechazarOrden(Long id) {
-        // HU-21: el Gerente rechaza una orden Pendiente de Autorización
         OrdenCompra orden = buscarOrConFallar(id);
         if (orden.getEstado() != EstadoOrden.PENDIENTE_AUTORIZACION) {
             throw new EstadoInvalidoException(
