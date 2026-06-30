@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.proveedor.msproveedor.dto.AjusteStockDTO;
 import com.proveedor.msproveedor.dto.ProductoDTO;
+import com.proveedor.msproveedor.dto.SucursalDTO;
 import com.proveedor.msproveedor.exception.EstadoInvalidoException;
 import com.proveedor.msproveedor.exception.RecursoNoEncontradoException;
 import com.proveedor.msproveedor.model.DetalleOrden;
@@ -44,21 +45,22 @@ public class OrdenCompraService {
     @Value("${ms.inventario.ajuste.url}")
     private String URL_MS_INVENTARIO_AJUSTE;
 
+    @Value("${ms.sucursales.url}")
+    private String URL_MS_SUCURSALES;
+
     public OrdenCompra crearOrdenCompra(OrdenCompra orden) {
         Proveedor proveedorCompleto = proveedorRepository.findById(orden.getProveedor().getIdProveedor())
                 .orElseThrow(() -> new RecursoNoEncontradoException(
                         "No se encontró el proveedor con id " + orden.getProveedor().getIdProveedor()));
-
         // No se puede comprar a un proveedor dado de baja
         if (proveedorCompleto.getEstado() == EstadoProveedor.INACTIVO) {
             throw new EstadoInvalidoException(
                     "No se puede crear una orden para un proveedor inactivo (id "
                             + proveedorCompleto.getIdProveedor() + ")");
         }
-
         orden.setProveedor(proveedorCompleto);
+        validarSucursal(orden.getIdSucursal());
         BigDecimal totalOrden = BigDecimal.ZERO;
-
         for (DetalleOrden detalle : orden.getDetalles()) {
             String url = URL_MS_PRODUCTOS + detalle.getIdProducto();
             try {
@@ -150,6 +152,19 @@ public class OrdenCompraService {
                     "Solo se pueden eliminar órdenes en estado Pendiente de Autorización");
         }
         ordenCompraRepository.delete(orden);
+    }
+
+    private void validarSucursal(Long idSucursal) {
+        String url = URL_MS_SUCURSALES + idSucursal;
+        try {
+            SucursalDTO sucursal = restTemplate.getForObject(url, SucursalDTO.class);
+            if (sucursal == null) {
+                throw new RecursoNoEncontradoException("La sucursal " + idSucursal + " no existe");
+            }
+        } catch (ResourceAccessException ex) {
+            log.warn("No se pudo validar la sucursal {} contra MS Sucursales (se omite validación): {}",
+                    idSucursal, ex.getMessage());
+        }
     }
 
 }
