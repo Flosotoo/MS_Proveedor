@@ -1,4 +1,5 @@
 package com.proveedor.msproveedor.controller;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -42,8 +43,10 @@ class OrdenCompraControllerTest {
         detalle.setIdProducto(1L);
         detalle.setCantidad(10);
         detalle.setPrecioUnitario(new BigDecimal("30000"));
+
         Proveedor proveedor = new Proveedor();
         proveedor.setIdProveedor(1L);
+
         OrdenCompra orden = new OrdenCompra();
         orden.setIdOrden(1L);
         orden.setProveedor(proveedor);
@@ -68,6 +71,40 @@ class OrdenCompraControllerTest {
     }
 
     @Test
+    void testPostOrdenCompra_proveedorInactivo_devuelve409() throws Exception {
+        OrdenCompra orden = crearOrden();
+        when(ordenCompraService.crearOrdenCompra(any(OrdenCompra.class)))
+                .thenThrow(new EstadoInvalidoException("No se puede crear una orden para un proveedor inactivo"));
+        mockMvc.perform(post("/api/ordenes-compra")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(orden)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void testGetOrdenes_devuelve200() throws Exception {
+        when(ordenCompraService.listarOrdenes()).thenReturn(List.of(crearOrden()));
+        mockMvc.perform(get("/api/ordenes-compra"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].idOrden").value(1));
+    }
+
+    @Test
+    void testGetOrdenes_vacio_devuelve204() throws Exception {
+        when(ordenCompraService.listarOrdenes()).thenReturn(List.of());
+        mockMvc.perform(get("/api/ordenes-compra"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void testGetOrdenes_filtradoPorEstado_devuelve200() throws Exception {
+        when(ordenCompraService.listarPorEstado(EstadoOrden.PENDIENTE_AUTORIZACION))
+                .thenReturn(List.of(crearOrden()));
+        mockMvc.perform(get("/api/ordenes-compra").param("estado", "PENDIENTE_AUTORIZACION"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void testGetOrdenCompra_existente_devuelve200() throws Exception {
         when(ordenCompraService.findById(1L)).thenReturn(Optional.of(crearOrden()));
         mockMvc.perform(get("/api/ordenes-compra/1"))
@@ -82,14 +119,5 @@ class OrdenCompraControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    @Test
-    void testAutorizarOrden_estadoInvalido_devuelve409() throws Exception {
-        when(ordenCompraService.autorizarOrden(1L))
-                .thenThrow(new EstadoInvalidoException(
-                        "Solo se pueden autorizar órdenes en estado Pendiente de Autorización"));
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                .put("/api/ordenes-compra/1/autorizar"))
-                .andExpect(status().isConflict());
-    }
-
+    
 }

@@ -26,6 +26,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
 import com.proveedor.msproveedor.exception.EstadoInvalidoException;
+import com.proveedor.msproveedor.exception.RecursoNoEncontradoException;
 import com.proveedor.msproveedor.model.DetalleOrden;
 import com.proveedor.msproveedor.model.EstadoOrden;
 import com.proveedor.msproveedor.model.EstadoProveedor;
@@ -144,5 +145,103 @@ class OrdenCompraServiceTest {
         assertEquals(EstadoOrden.RECIBIDA, resultado.getEstado());
         assertNotNull(resultado.getFechaRecepcion());
         verify(restTemplate, times(1)).put(contains("ajustar"), any());
+    }
+
+    @Test
+    void testCrearOrdenCompra_proveedorNoExiste_lanzaExcepcion() {
+        OrdenCompra orden = crearOrden();
+        when(proveedorRepository.findById(1L)).thenReturn(Optional.empty());
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> ordenCompraService.crearOrdenCompra(orden));
+        verify(ordenCompraRepository, never()).save(any(OrdenCompra.class));
+    }
+
+    @Test
+    void testAutorizarOrden_pendiente_quedaAutorizada() {
+        OrdenCompra orden = crearOrden();
+        orden.setIdOrden(1L);
+        orden.setEstado(EstadoOrden.PENDIENTE_AUTORIZACION);
+        when(ordenCompraRepository.findById(1L)).thenReturn(Optional.of(orden));
+        when(ordenCompraRepository.save(any(OrdenCompra.class))).thenAnswer(inv -> inv.getArgument(0));
+        OrdenCompra resultado = ordenCompraService.autorizarOrden(1L);
+        assertEquals(EstadoOrden.AUTORIZADA, resultado.getEstado());
+        verify(ordenCompraRepository, times(1)).save(any(OrdenCompra.class));
+    }
+
+    @Test
+    void testRechazarOrden_pendiente_quedaRechazada() {
+        OrdenCompra orden = crearOrden();
+        orden.setIdOrden(1L);
+        orden.setEstado(EstadoOrden.PENDIENTE_AUTORIZACION);
+        when(ordenCompraRepository.findById(1L)).thenReturn(Optional.of(orden));
+        when(ordenCompraRepository.save(any(OrdenCompra.class))).thenAnswer(inv -> inv.getArgument(0));
+        OrdenCompra resultado = ordenCompraService.rechazarOrden(1L);
+        assertEquals(EstadoOrden.RECHAZADA, resultado.getEstado());
+    }
+
+    @Test
+    void testRechazarOrden_estadoInvalido_lanzaExcepcion() {
+        OrdenCompra orden = crearOrden();
+        orden.setIdOrden(1L);
+        orden.setEstado(EstadoOrden.RECIBIDA); // ya no es pendiente
+        when(ordenCompraRepository.findById(1L)).thenReturn(Optional.of(orden));
+        assertThrows(EstadoInvalidoException.class,
+                () -> ordenCompraService.rechazarOrden(1L));
+        verify(ordenCompraRepository, never()).save(any(OrdenCompra.class));
+    }
+
+    @Test
+    void testRecibirOrden_noAutorizada_lanzaExcepcion() {
+        OrdenCompra orden = crearOrden();
+        orden.setIdOrden(1L);
+        orden.setEstado(EstadoOrden.PENDIENTE_AUTORIZACION); // no está autorizada
+        when(ordenCompraRepository.findById(1L)).thenReturn(Optional.of(orden));
+        assertThrows(EstadoInvalidoException.class,
+                () -> ordenCompraService.recibirOrden(1L));
+        // No debe ajustar stock si no estaba autorizada
+        verify(restTemplate, never()).put(anyString(), any());
+    }
+
+    @Test
+    void testEliminarOrdenCompra_pendiente_seElimina() {
+        OrdenCompra orden = crearOrden();
+        orden.setIdOrden(1L);
+        orden.setEstado(EstadoOrden.PENDIENTE_AUTORIZACION);
+        when(ordenCompraRepository.findById(1L)).thenReturn(Optional.of(orden));
+        ordenCompraService.eliminarOrdenCompra(1L);
+        verify(ordenCompraRepository, times(1)).delete(orden);
+    }
+
+    @Test
+    void testEliminarOrdenCompra_yaAutorizada_lanzaExcepcion() {
+        OrdenCompra orden = crearOrden();
+        orden.setIdOrden(1L);
+        orden.setEstado(EstadoOrden.AUTORIZADA); // ya no se puede eliminar
+        when(ordenCompraRepository.findById(1L)).thenReturn(Optional.of(orden));
+        assertThrows(EstadoInvalidoException.class,
+                () -> ordenCompraService.eliminarOrdenCompra(1L));
+        verify(ordenCompraRepository, never()).delete(any(OrdenCompra.class));
+    }
+
+    @Test
+    void testListarPorEstado_devuelveFiltradas() {
+        OrdenCompra orden = crearOrden();
+        orden.setEstado(EstadoOrden.PENDIENTE_AUTORIZACION);
+        when(ordenCompraRepository.findByEstado(EstadoOrden.PENDIENTE_AUTORIZACION))
+                .thenReturn(List.of(orden));
+        List<OrdenCompra> resultado = ordenCompraService.listarPorEstado(EstadoOrden.PENDIENTE_AUTORIZACION);
+        assertEquals(1, resultado.size());
+        verify(ordenCompraRepository, times(1)).findByEstado(EstadoOrden.PENDIENTE_AUTORIZACION);
+    }
+
+    @Test
+    void testFindById_existente() {
+        OrdenCompra orden = crearOrden();
+        orden.setIdOrden(1L);
+        when(ordenCompraRepository.findById(1L)).thenReturn(Optional.of(orden));
+
+        Optional<OrdenCompra> resultado = ordenCompraService.findById(1L);
+
+        assertTrue(resultado.isPresent());
     }
 }
