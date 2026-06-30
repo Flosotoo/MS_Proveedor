@@ -9,7 +9,7 @@ Microservicio de gestión de proveedores y órdenes de compra para Perfulandia S
 
 ## Estudiante
 
-Flo
+Florencia Soto
 
 ## Tecnologías
 
