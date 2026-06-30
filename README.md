@@ -1,62 +1,288 @@
-ms-proveedor
-Microservicio desarrollado con Spring Boot para la gestión de proveedores y órdenes de reabastecimiento. Forma parte de una arquitectura de microservicios y se comunica con ms-sucursales para validar sucursales al momento de crear órdenes.
+# Microservicio Proveedores
 
-Tecnologías utilizadas
-Java + Spring Boot
-Spring Data JPA
-Spring Web (RestTemplate)
-Lombok
-Base de datos relacional (JPA/Hibernate)
+## Descripción
 
+Microservicio de gestión de proveedores y órdenes de compra para Perfulandia SPA. Administra el catálogo de proveedores, el ciclo de autorización de órdenes de compra y la recepción de mercadería, ingresando el stock recibido al MS Productos y Stock.
 
-Estructura del proyecto
-msproveedor/
-├── config/
-│   └── RestTemplateConfig.java         # Bean de RestTemplate para llamadas HTTP
-├── controller/
-│   ├── ProveedorController.java         # Endpoints REST de proveedores
-│   └── OrdenReabastecimientoController.java  # Endpoints REST de órdenes
-├── model/
-│   ├── Proveedor.java                   # Entidad Proveedor
-│   ├── OrdenReabastecimiento.java       # Entidad OrdenReabastecimiento
-│   ├── DetalleOrden.java                # Entidad DetalleOrden
-│   ├── EstadoProveedor.java             # Enum: ACTIVO, INACTIVO
-│   ├── EstadoOrden.java                 # Enum: PENDIENTE, EN_PROCESO, COMPLETADA, RECIBIDA, CANCELADA
-│   ├── CatalogoDTO.java                 # DTO para productos del catálogo
-│   └── SucursalDTO.java                 # DTO para sucursales externas
-├── repository/
-│   ├── ProveedorRepository.java
-│   └── OrdenReabastecimientoRepository.java
-└── service/
-    ├── ProveedorService.java
-    └── OrdenReabastecimientoService.java
+- Historias de usuario: HU-16 a HU-21 y HU-46.
+- Swagger/OpenAPI disponible en: <http://localhost:8084/swagger-ui.html>
 
-Endpoints disponibles
-Proveedores — /api/v1/proveedores
-MétodoRutaDescripciónGET/api/v1/proveedoresListar todos los proveedoresGET/api/v1/proveedores/{rut}Obtener proveedor por RUTPOST/api/v1/proveedoresCrear nuevo proveedorPUT/api/v1/proveedores/{rut}Actualizar proveedor existenteDELETE/api/v1/proveedores/{rut}Desactivar proveedor (soft delete)
-Órdenes de Reabastecimiento — /api/v1/ordenes
-MétodoRutaDescripciónGET/api/v1/ordenesListar todas las órdenesGET/api/v1/ordenes/proveedor/{rut}Listar órdenes de un proveedorPOST/api/v1/ordenesCrear nueva ordenPUT/api/v1/ordenes/autorizar/{idOrden}Autorizar orden → estado COMPLETADAPUT/api/v1/ordenes/recibir/{idOrden}Marcar orden como recibida → estado RECIBIDADELETE/api/v1/ordenes/{idOrden}Cancelar orden → estado CANCELADA
+## Estudiante
 
-Modelos principales
-Proveedor
-CampoTipoDescripciónrutProveedorStringIdentificador único (PK)nombreStringNombre del proveedorcorreoStringCorreo electrónico (único)telefonoStringTeléfono (máx. 12 caracteres)direccionStringDirecciónestadoEstadoProveedorACTIVO o INACTIVO
-OrdenReabastecimiento
-CampoTipoDescripciónidOrdenLongIdentificador único (PK, auto)rutProveedorStringRUT del proveedor asociadoidSucursalLongID de la sucursal destinofechaSolicitudLocalDateFecha de creación de la ordenfechaRecepcionLocalDateFecha de recepciónestadoEstadoOrdenEstado actual de la ordentotaldoubleMonto total de la orden
+Flo
 
-Estados de una orden
-PENDIENTE → EN_PROCESO → COMPLETADA → RECIBIDA
-                ↓
-            CANCELADA
-Al crear una orden, el estado se establece automáticamente en EN_PROCESO.
+## Tecnologías
 
-Comunicación entre microservicios
-Al crear una orden, el servicio intenta validar la sucursal llamando a:
-GET http://localhost:8084/api/v1/sucursales/{idSucursal}
-Si ms-sucursales no está disponible, la orden se guarda igualmente (tolerancia a fallos).
+- Java 25, Spring Boot 4.x, JPA/Hibernate, Bean Validation
+- MySQL 8.x (para Duoc/XAMPP)
+- Comunicación entre microservicios vía RestTemplate (consume MS Productos y Stock, y MS Sucursales)
+- Maven, Swagger/OpenAPI (springdoc)
 
-Lógica de negocio destacada
+## Microservicios que consume
 
-Eliminar proveedor: aplica soft delete, cambiando el estado a INACTIVO en lugar de borrar el registro.
-Cancelar orden: cambia el estado a CANCELADA sin borrar el registro.
-Recibir orden: registra la fecha de recepción automáticamente con LocalDate.now().
-Crear orden: valida que el proveedor exista antes de persistir.
+Este MS se comunica con otros microservicios vía REST para validar y operar:
+
+| MS destino | Puerto | Para qué |
+| ---------- | ------ | -------- |
+| MS Productos y Stock | 8082 | Validar que el producto exista al crear la orden, e ingresar stock al recibir la mercadería |
+| MS Sucursales y Logística | 8087 | Validar que la sucursal de la orden exista |
+
+Ambas llamadas usan **degradación elegante**: si el MS externo está caído (timeout), la operación continúa con una advertencia en el log en vez de fallar, para no acoplar la disponibilidad de este MS a la de los otros.
+
+## Endpoints
+
+### Proveedores
+
+| Método | Ruta | HU | Descripción |
+| ------ | ---- | -- | ----------- |
+| POST | `/api/proveedores` | HU-16 | Registrar proveedor (queda en estado ACTIVO) |
+| GET | `/api/proveedores` | HU-17 | Listar proveedores activos |
+| GET | `/api/proveedores/{id}` | HU-17 | Obtener un proveedor por id |
+| PUT | `/api/proveedores/{id}` | HU-18 | Actualizar datos de un proveedor (el RUT no se puede cambiar) |
+| DELETE | `/api/proveedores/{id}` | HU-19 | Desactivar proveedor (baja lógica: estado INACTIVO) |
+
+### Órdenes de compra
+
+| Método | Ruta | HU | Descripción |
+| ------ | ---- | -- | ----------- |
+| POST | `/api/ordenes-compra` | HU-46 | Crear orden de compra (queda PENDIENTE_AUTORIZACION) |
+| GET | `/api/ordenes-compra` | HU-21 | Listar órdenes (filtro opcional por `?estado=`) |
+| GET | `/api/ordenes-compra/{id}` | HU-21 | Obtener una orden por id |
+| PUT | `/api/ordenes-compra/{id}/autorizar` | HU-21 | Autorizar una orden pendiente → AUTORIZADA |
+| PUT | `/api/ordenes-compra/{id}/rechazar` | HU-21 | Rechazar una orden pendiente → RECHAZADA |
+| PUT | `/api/ordenes-compra/{id}/recibir` | HU-20 | Recibir mercadería de una orden autorizada → RECIBIDA (ingresa stock) |
+| DELETE | `/api/ordenes-compra/{id}` | — | Eliminar una orden (solo si está PENDIENTE_AUTORIZACION) |
+
+## Ejecución
+
+```
+./mvnw spring-boot:run
+```
+
+El servidor corre en **<http://localhost:8084>**.
+
+Requiere que MySQL esté corriendo (XAMPP). La base de datos `db_proveedor` se crea automáticamente (`createDatabaseIfNotExist=true`) y las tablas vía Hibernate (`ddl-auto=update`).
+
+## Pruebas automatizadas
+
+### Tests unitarios y de integración (JUnit + Mockito)
+
+```
+./mvnw test
+```
+
+El MS incluye tres niveles de prueba:
+
+- **`OrdenCompraServiceTest`** (unitario, Mockito): valida las reglas de negocio del service — cálculo del total de la orden, rechazo de orden a proveedor inactivo, control de estados (no autorizar una orden ya autorizada) y recepción que ingresa stock.
+- **`OrdenCompraControllerTest`** (`@WebMvcTest`): valida la capa web aislada — códigos HTTP correctos (201/200/404/409) con el service mockeado.
+- **`OrdenCompraControllerIT`** (`@SpringBootTest`): valida la cadena completa controller → service → base de datos (H2 en memoria), mockeando solo las llamadas a otros microservicios.
+
+## Estructura de requests y respuestas
+
+### POST /api/proveedores — Registrar proveedor
+
+```
+// Request
+{
+  "rut": "76543210-9",
+  "razonSocial": "Distribuidora Aromas Ltda",
+  "direccion": "Av. Providencia 1234, Santiago",
+  "correo": "ventas@aromas.cl",
+  "telefono": "+56912345678"
+}
+
+// Response: 201 Created
+{
+  "idProveedor": 1,
+  "rut": "76543210-9",
+  "razonSocial": "Distribuidora Aromas Ltda",
+  "direccion": "Av. Providencia 1234, Santiago",
+  "correo": "ventas@aromas.cl",
+  "telefono": "+56912345678",
+  "estado": "ACTIVO"
+}
+```
+
+**Validaciones:**
+
+- RUT único (409 Conflict si ya existe un proveedor con ese RUT)
+- Todos los campos son obligatorios: rut, razonSocial, direccion, correo, telefono
+- El estado se asigna automáticamente como ACTIVO (no se envía)
+
+### GET /api/proveedores — Listar proveedores activos
+
+```
+Response: 200 OK → lista de proveedores en estado ACTIVO
+Response: 204 No Content → si no hay proveedores activos
+```
+
+Solo devuelve los proveedores ACTIVO; los desactivados (INACTIVO) quedan excluidos.
+
+### PUT /api/proveedores/{id} — Actualizar proveedor
+
+```
+// Request
+{
+  "razonSocial": "Distribuidora Aromas SpA",
+  "direccion": "Av. Nueva 999, Santiago",
+  "correo": "contacto@aromas.cl",
+  "telefono": "+56987654321"
+}
+
+// Response: 200 OK → proveedor actualizado
+```
+
+**Regla:** El RUT no se puede cambiar (se conserva el original aunque se envíe otro). 404 si el proveedor no existe.
+
+### DELETE /api/proveedores/{id} — Desactivar proveedor
+
+```
+Response: 200 OK → proveedor con estado INACTIVO
+```
+
+Baja lógica: el proveedor no se borra, solo pasa a estado INACTIVO y deja de aparecer en el listado. 404 si no existe.
+
+### POST /api/ordenes-compra — Crear orden de compra
+
+```
+// Request
+{
+  "proveedor": { "idProveedor": 1 },
+  "idSucursal": 1,
+  "detalles": [
+    {
+      "idProducto": 1,
+      "cantidad": 10,
+      "precioUnitario": 30000
+    }
+  ]
+}
+
+// Response: 201 Created
+{
+  "idOrden": 1,
+  "proveedor": { "idProveedor": 1, "rut": "76543210-9", "estado": "ACTIVO", ... },
+  "idSucursal": 1,
+  "fechaSolicitud": "2026-06-30T12:00:00",
+  "fechaRecepcion": null,
+  "estado": "PENDIENTE_AUTORIZACION",
+  "total": 300000,
+  "detalles": [
+    { "idDetalleOrden": 1, "idProducto": 1, "cantidad": 10, "precioUnitario": 30000, "subtotal": 300000 }
+  ]
+}
+```
+
+**Reglas de negocio:**
+
+- El proveedor debe existir (404 si no)
+- No se puede crear una orden para un proveedor INACTIVO (409 Conflict)
+- El total se calcula como la suma de los subtotales (cantidad × precioUnitario)
+- La orden queda en estado PENDIENTE_AUTORIZACION
+- Cada producto se valida contra MS Productos y Stock; la sucursal contra MS Sucursales (con degradación elegante si están caídos)
+
+### GET /api/ordenes-compra — Listar órdenes
+
+```
+GET /api/ordenes-compra
+GET /api/ordenes-compra?estado=PENDIENTE_AUTORIZACION
+
+Response: 200 OK → lista de órdenes
+Response: 204 No Content → si no hay resultados
+```
+
+El filtro `?estado=` (HU-21) permite listar las órdenes pendientes de autorización. Valores: `PENDIENTE_AUTORIZACION`, `AUTORIZADA`, `RECHAZADA`, `RECIBIDA`.
+
+### PUT /api/ordenes-compra/{id}/autorizar — Autorizar orden
+
+```
+Response: 200 OK → orden con estado AUTORIZADA
+```
+
+**Regla:** Solo se pueden autorizar órdenes en estado PENDIENTE_AUTORIZACION (409 Conflict en caso contrario). 404 si la orden no existe.
+
+### PUT /api/ordenes-compra/{id}/rechazar — Rechazar orden
+
+```
+Response: 200 OK → orden con estado RECHAZADA
+```
+
+**Regla:** Solo se pueden rechazar órdenes en estado PENDIENTE_AUTORIZACION (409 Conflict en caso contrario).
+
+### PUT /api/ordenes-compra/{id}/recibir — Recibir mercadería
+
+```
+Response: 200 OK → orden con estado RECIBIDA y fechaRecepcion seteada
+```
+
+**Reglas de negocio:**
+
+- Solo se puede recibir una orden en estado AUTORIZADA (409 Conflict en caso contrario)
+- Al recibir, ingresa el stock de cada detalle al MS Productos y Stock (ajuste positivo)
+- El ajuste de stock usa un `idOperacion` único (`orden-{id}-producto-{id}`) para garantizar idempotencia: si la llamada se repite, el stock no se duplica
+
+### DELETE /api/ordenes-compra/{id} — Eliminar orden
+
+```
+Response: 204 No Content
+```
+
+**Regla:** Solo se pueden eliminar órdenes en estado PENDIENTE_AUTORIZACION (409 Conflict si ya fue autorizada, rechazada o recibida). 404 si no existe.
+
+## Ciclo de vida de una orden de compra
+
+```
+                  crear
+                    │
+                    ▼
+        PENDIENTE_AUTORIZACION ──── eliminar ──► (borrada)
+            │              │
+       autorizar        rechazar
+            │              │
+            ▼              ▼
+        AUTORIZADA      RECHAZADA
+            │
+         recibir (ingresa stock)
+            │
+            ▼
+         RECIBIDA
+```
+
+## Manejo de errores
+
+El MS usa un `GlobalExceptionHandler` que traduce las excepciones a códigos HTTP coherentes:
+
+| Excepción | Código | Cuándo |
+| --------- | ------ | ------ |
+| `RecursoNoEncontradoException` | 404 Not Found | Proveedor u orden inexistente |
+| `RecursoDuplicadoException` | 409 Conflict | RUT de proveedor duplicado |
+| `EstadoInvalidoException` | 409 Conflict | Operación no válida para el estado actual (ej. autorizar una orden ya autorizada, orden a proveedor inactivo) |
+| `MethodArgumentNotValidException` | 400 Bad Request | Validación de campos fallida |
+| `HttpMessageNotReadableException` | 400 Bad Request | JSON mal formado |
+| `RestClientException` | 502 Bad Gateway | Error al comunicarse con otro microservicio |
+
+## Configuración de base de datos
+
+La aplicación usa MySQL. La base de datos `db_proveedor` se crea automáticamente (`createDatabaseIfNotExist=true`). Las tablas se crean vía Hibernate (`ddl-auto=update`).
+
+Credenciales por defecto en `application.properties`:
+
+- Usuario: `root`
+- Contraseña: *(vacía, como en XAMPP por defecto)*
+
+URLs de los microservicios que consume (en `application.properties`):
+
+```
+ms.productos.url=http://localhost:8082/api/productos/
+ms.inventario.ajuste.url=http://localhost:8082/api/inventario/ajustar
+ms.sucursales.url=http://localhost:8087/api/v1/sucursales/
+```
+
+## Swagger / OpenAPI
+
+Documentación interactiva disponible en:
+
+- Swagger UI: <http://localhost:8084/swagger-ui.html>
+- API Docs (JSON): <http://localhost:8084/v3/api-docs>
+
+Cada endpoint está documentado con su Historia de Usuario correspondiente para trazabilidad.

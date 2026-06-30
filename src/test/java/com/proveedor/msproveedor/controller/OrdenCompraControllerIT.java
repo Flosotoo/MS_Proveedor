@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.proveedor.msproveedor.dto.ProductoDTO;
+import com.proveedor.msproveedor.dto.SucursalDTO;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -70,6 +72,12 @@ class OrdenCompraControllerIT {
         productoDTO.setIdProducto(1L);
         productoDTO.setNombre("Producto Test");
         when(restTemplate.getForObject(anyString(), eq(ProductoDTO.class))).thenReturn(productoDTO);
+        // sucursal valida
+        SucursalDTO sucursal = new SucursalDTO();
+        sucursal.setIdSucursal(1L);
+        sucursal.setNombre("Sucursal Centro");
+        when(restTemplate.getForObject(anyString(), eq(SucursalDTO.class))).thenReturn(sucursal);
+
         doNothing().when(restTemplate).put(anyString(), any());
     }
 

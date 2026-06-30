@@ -35,6 +35,7 @@ import com.proveedor.msproveedor.repository.OrdenCompraRepository;
 import com.proveedor.msproveedor.repository.ProveedorRepository;
 import static org.mockito.ArgumentMatchers.eq;
 import com.proveedor.msproveedor.dto.ProductoDTO;
+import com.proveedor.msproveedor.dto.SucursalDTO;
 
 @ExtendWith(MockitoExtension.class)
 class OrdenCompraServiceTest {
@@ -56,6 +57,8 @@ class OrdenCompraServiceTest {
                 "http://localhost:9999/api/productos/");
         ReflectionTestUtils.setField(ordenCompraService, "URL_MS_INVENTARIO_AJUSTE",
                 "http://localhost:9999/api/inventario/ajustar");
+        ReflectionTestUtils.setField(ordenCompraService, "URL_MS_SUCURSALES",
+                "http://localhost:9999/api/v1/sucursales/");
     }
 
     private Proveedor crearProveedor(EstadoProveedor estado) {
@@ -86,6 +89,11 @@ class OrdenCompraServiceTest {
         // 10 x 30000 = 300000 queda en pendiente_autorizacion
         OrdenCompra orden = crearOrden();
         when(proveedorRepository.findById(1L)).thenReturn(Optional.of(crearProveedor(EstadoProveedor.ACTIVO)));
+        // Sucursal Valida
+        SucursalDTO sucursal = new SucursalDTO();
+        sucursal.setIdSucursal(1L);
+        sucursal.setNombre("Sucursal Centro");
+        when(restTemplate.getForObject(anyString(), eq(SucursalDTO.class))).thenReturn(sucursal);
         // El producto existe: devolvemos y se devuelve un ProductoDTO real
         ProductoDTO productoDTO = new ProductoDTO();
         productoDTO.setIdProducto(1L);
