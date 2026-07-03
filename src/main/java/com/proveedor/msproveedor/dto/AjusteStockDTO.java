@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 public class AjusteStockDTO {
     private Long idProducto;
     private Long idSucursal;
-    private int cantidad;
+    private int cantidadDelta;
     private String idOperacion;
 }
