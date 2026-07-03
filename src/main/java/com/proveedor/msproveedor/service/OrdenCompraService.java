@@ -75,13 +75,11 @@ public class OrdenCompraService {
                 log.warn("No se pudo validar el producto {} contra MS Productos y Stock: {}",
                         detalle.getIdProducto(), ex.getMessage());
             }
-
             detalle.setOrdenCompra(orden);
             BigDecimal subtotal = detalle.getPrecioUnitario().multiply(BigDecimal.valueOf(detalle.getCantidad()));
             detalle.setSubtotal(subtotal);
             totalOrden = totalOrden.add(subtotal);
         }
-
         orden.setTotal(totalOrden);
         orden.setEstado(EstadoOrden.PENDIENTE_AUTORIZACION);
         orden.setFechaSolicitud(LocalDateTime.now());
@@ -99,7 +97,6 @@ public class OrdenCompraService {
         orden.setEstado(EstadoOrden.AUTORIZADA);
         return ordenCompraRepository.save(orden);
     }
-
     public OrdenCompra rechazarOrden(Long id) {
         OrdenCompra orden = buscarOrConFallar(id);
         if (orden.getEstado() != EstadoOrden.PENDIENTE_AUTORIZACION) {
@@ -115,7 +112,6 @@ public class OrdenCompraService {
         if (orden.getEstado() != EstadoOrden.AUTORIZADA) {
             throw new EstadoInvalidoException("Solo se puede recibir una orden que esté Autorizada");
         }
-
         for (DetalleOrden detalle : orden.getDetalles()) {
             AjusteStockDTO ajuste = new AjusteStockDTO(
                     detalle.getIdProducto(), orden.getIdSucursal(), detalle.getCantidad(),
