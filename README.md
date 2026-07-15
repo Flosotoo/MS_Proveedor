@@ -27,7 +27,7 @@ Este MS se comunica con otros microservicios vía REST para validar y operar:
 | MS Productos y Stock | 8082 | Validar que el producto exista al crear la orden, e ingresar stock al recibir la mercadería |
 | MS Sucursales y Logística | 8087 | Validar que la sucursal de la orden exista |
 
-Ambas llamadas usan **degradación elegante**: si el MS externo está caído (timeout), la operación continúa con una advertencia en el log en vez de fallar, para no acoplar la disponibilidad de este MS a la de los otros.
+Ambas llamadas usan **degradación elegante**: si el MS externo está caído (timeout, `ResourceAccessException`), la operación continúa con una advertencia en el log en vez de fallar, para no acoplar la disponibilidad de este MS a la de los otros. El `RestTemplate` se configura con timeouts de conexión y lectura de 3 segundos (`RestTemplateConfig`). Nota: si el MS responde pero el producto o la sucursal no existen, sí se rechaza la operación (404); la degradación solo aplica cuando el MS externo no responde.
 
 ## Endpoints
 
@@ -71,11 +71,12 @@ Requiere que MySQL esté corriendo (XAMPP). La base de datos `db_proveedor` se c
 ./mvnw test
 ```
 
-El MS incluye tres niveles de prueba:
+El MS incluye cuatro clases de prueba, organizadas en tres niveles (unitario, web e integración):
 
-- **`OrdenCompraServiceTest`** (unitario, Mockito): valida las reglas de negocio del service — cálculo del total de la orden, rechazo de orden a proveedor inactivo, control de estados (no autorizar una orden ya autorizada) y recepción que ingresa stock.
-- **`OrdenCompraControllerTest`** (`@WebMvcTest`): valida la capa web aislada — códigos HTTP correctos (201/200/404/409) con el service mockeado.
-- **`OrdenCompraControllerIT`** (`@SpringBootTest`): valida la cadena completa controller → service → base de datos (H2 en memoria), mockeando solo las llamadas a otros microservicios.
+- **`OrdenCompraServiceTest`** (unitario, Mockito): valida las reglas de negocio del service de órdenes — cálculo del total de la orden y estado inicial PENDIENTE_AUTORIZACION, rechazo de orden a proveedor inactivo, rechazo por proveedor inexistente, control de estados en el ciclo de autorización (autorizar/rechazar solo una orden pendiente), recepción que ingresa stock y pasa a RECIBIDA, rechazo de recepción si la orden no está autorizada, eliminación solo en estado pendiente y listado filtrado por estado. Mockea las llamadas a los otros microservicios.
+- **`ProveedorServiceTest`** (unitario, Mockito): valida las reglas de negocio del service de proveedores — creación que queda ACTIVO, rechazo por RUT duplicado, listado de solo activos, conservación del RUT original al actualizar, conservación del estado existente cuando no se envía, baja lógica (paso a INACTIVO sin borrar) y manejo de proveedor inexistente al actualizar o desactivar.
+- **`OrdenCompraControllerTest`** (`@WebMvcTest`): valida la capa web aislada — códigos HTTP correctos (201/200/204/404/409) con el service mockeado, incluyendo el rechazo por proveedor inactivo (409) y el listado filtrado por estado.
+- **`OrdenCompraControllerIT`** (`@SpringBootTest` + `@ActiveProfiles("test")`): valida la cadena completa controller → service → base de datos (H2 en memoria), mockeando solo las llamadas a otros microservicios. Verifica la creación con cálculo de total, el 404 por proveedor inexistente y el 404 por orden inexistente.
 
 ## Estructura de requests y respuestas
 
@@ -132,7 +133,7 @@ Solo devuelve los proveedores ACTIVO; los desactivados (INACTIVO) quedan excluid
 // Response: 200 OK → proveedor actualizado
 ```
 
-**Regla:** El RUT no se puede cambiar (se conserva el original aunque se envíe otro). 404 si el proveedor no existe.
+**Regla:** El RUT no se puede cambiar (se conserva el original aunque se envíe otro). Si no se envía estado, se conserva el que ya tenía. 404 si el proveedor no existe.
 
 ### DELETE /api/proveedores/{id} — Desactivar proveedor
 
@@ -257,6 +258,7 @@ El MS usa un `GlobalExceptionHandler` que traduce las excepciones a códigos HTT
 | `RecursoNoEncontradoException` | 404 Not Found | Proveedor u orden inexistente |
 | `RecursoDuplicadoException` | 409 Conflict | RUT de proveedor duplicado |
 | `EstadoInvalidoException` | 409 Conflict | Operación no válida para el estado actual (ej. autorizar una orden ya autorizada, orden a proveedor inactivo) |
+| `DataIntegrityViolationException` | 409 Conflict | El recurso ya existe o viola una restricción de la base de datos (ej. RUT duplicado a nivel de BD) |
 | `MethodArgumentNotValidException` | 400 Bad Request | Validación de campos fallida |
 | `HttpMessageNotReadableException` | 400 Bad Request | JSON mal formado |
 | `RestClientException` | 502 Bad Gateway | Error al comunicarse con otro microservicio |
